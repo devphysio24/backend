@@ -3,7 +3,7 @@ services:
     name: kpi-api
     env: node
     region: singapore
-    buildCommand: npm ci || (rm -rf node_modules && npm install)
+    buildCommand: rm -rf node_modules && npm cache clean --force && npm ci --prefer-offline --no-audit
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
