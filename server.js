@@ -45,65 +45,31 @@ app.use(additionalSecurityHeaders);
 
 // ---------- CORS BEFORE BODY/COMPRESSION ----------
 app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  // Allow all .onrender.com domains
-  const isAllowedOrigin = !origin || 
-    origin.includes('localhost') || 
-    origin.includes('127.0.0.1') ||
-    /\.onrender\.com$/.test(origin);
-  
-  if (isAllowedOrigin && origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (isAllowedOrigin) {
-    res.header('Access-Control-Allow-Origin', '*');
-  } else {
-    res.header('Access-Control-Allow-Origin', '*');
-  }
-  
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-CSRF-Token');
-  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Credentials', 'true'); // ✅ FIXED: Enable credentials
   res.header('Access-Control-Max-Age', '86400');
   res.status(200).end();
 });
 
 app.use(
   cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      process.env.FRONTEND_URL || 'http://localhost:3000',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://sociosystem.onrender.com',
-      /\.onrender\.com$/,
-    ];
-    
-    // Check if origin matches any allowed pattern
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (typeof allowed === 'string') {
-        return origin === allowed;
-      } else if (allowed instanceof RegExp) {
-        return allowed.test(origin);
-      }
-      return false;
-    });
-    
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.warn('⚠️ CORS: Blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
+  origin: [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://sociosystem.onrender.com',
+    'https://frontend-eight-kappa-69.vercel.app',
+    /\.onrender\.com$/,
+    /\.vercel\.app$/, // Allow all Vercel deployments (production and preview)
+  ],
+  credentials: true, // ✅ FIXED: Enable credentials for CORS
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-CSRF-Token'],
   optionsSuccessStatus: 200,
-  preflightContinue: false,
-  maxAge: 86400,
+    preflightContinue: false,
+    maxAge: 86400,
   })
 );
 
