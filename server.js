@@ -53,21 +53,51 @@ app.options('*', (req, res) => {
   res.status(200).end();
 });
 
-app.use(
-  cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
+// CORS origin validation function
+const corsOrigin = (origin, callback) => {
+  // Allow requests with no origin (like mobile apps, Postman, etc.)
+  if (!origin) {
+    return callback(null, true);
+  }
+
+  // List of allowed origins
+  const allowedOrigins = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'http://localhost:3001',
     'https://sociosystem.onrender.com',
     'https://frontend-eight-kappa-69.vercel.app',
-    /\.onrender\.com$/,
-    /\.vercel\.app$/, // Allow all Vercel deployments (production and preview)
-  ],
-  credentials: true, // ✅ FIXED: Enable credentials for CORS
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-CSRF-Token'],
-  optionsSuccessStatus: 200,
+    process.env.FRONTEND_URL,
+  ].filter(Boolean); // Remove undefined values
+
+  // Check exact matches
+  if (allowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+
+  // Check regex patterns
+  if (/\.onrender\.com$/.test(origin)) {
+    logger.info('✅ CORS: Allowed Render origin', { origin });
+    return callback(null, true);
+  }
+
+  if (/\.vercel\.app$/.test(origin)) {
+    logger.info('✅ CORS: Allowed Vercel origin', { origin });
+    return callback(null, true);
+  }
+
+  // Block unknown origins
+  logger.warn('⚠️ CORS: Blocked origin', { origin });
+  callback(new Error('Not allowed by CORS'));
+};
+
+app.use(
+  cors({
+    origin: corsOrigin,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-CSRF-Token'],
+    optionsSuccessStatus: 200,
     preflightContinue: false,
     maxAge: 86400,
   })
