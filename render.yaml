@@ -2,8 +2,7 @@ services:
   - type: web
     name: kpi-api
     env: node
-    region: singapore
-    buildCommand: rm -rf node_modules .npm && npm install --force --legacy-peer-deps
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
@@ -21,23 +20,11 @@ services:
       - key: FRONTEND_URL
         value: https://sociosystem.onrender.com
       - key: USE_SUPABASE
-        value: "true"
+        value: true
       - key: LOG_LEVEL
         value: info
       - key: ENABLE_SCHEDULED_JOBS
-        value: "true"
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-      - key: CSRF_SECRET
-        sync: false
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
+        value: true
     healthCheckPath: /health
     plan: starter
 
