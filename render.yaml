@@ -19,6 +19,7 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://sociosystem.onrender.com
+        # Note: CORS allows all .onrender.com domains via regex pattern
       - key: USE_SUPABASE
         value: true
       - key: LOG_LEVEL
