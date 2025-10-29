@@ -3,7 +3,7 @@ services:
     name: kpi-api
     env: node
     region: singapore
-    buildCommand: rm -rf node_modules && npm install
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
