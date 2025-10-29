@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: kpi-api
+    env: node
+    region: singapore
+    buildCommand: rm -rf node_modules && npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.3
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://sociosystem.onrender.com
+      - key: USE_SUPABASE
+        value: "true"
+      - key: LOG_LEVEL
+        value: info
+      - key: ENABLE_SCHEDULED_JOBS
+        value: "true"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CSRF_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+    healthCheckPath: /health
+    plan: starter
+
