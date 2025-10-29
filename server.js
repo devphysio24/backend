@@ -8,7 +8,6 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 const { monitorEventLoopDelay } = require('perf_hooks');
-const { db } = require('./config/supabase.local'); // keep import for side-effects (DB init)
 const asyncHandler = require('./middleware/asyncHandler');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const { securityHeaders, additionalSecurityHeaders } = require('./middleware/securityHeaders');
@@ -31,6 +30,9 @@ try {
   logger.error('Failed to load configuration', { error: error.message });
   process.exit(1);
 }
+
+// Load Supabase config only after env is ready
+const { db } = require('./config/supabase.local'); // keep import for side-effects (DB init)
 
 const app = express();
 
@@ -179,6 +181,13 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ---------- CSRF TOKEN ----------
+app.get('/api/csrf-token', (req, res) => {
+  // Simple CSRF token generation for frontend
+  const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  res.json({ csrfToken: token });
+});
+
 // ---------- DEV/ADMIN: CLEANUP ----------
 app.post('/cleanup', (req, res) => {
   const allowCleanup =
@@ -225,6 +234,7 @@ const caseRoutes = require('./routes/cases');
 const appointmentRoutes = require('./routes/appointments');
 const clinicianRoutes = require('./routes/clinicians');
 const teamLeaderRoutes = require('./routes/teamLeader');
+const authRoutes = require('./routes/auth.supabase');
 // Use Supabase admin routes
 const adminRoutes = require('./routes/admin.supabase');
 
@@ -237,6 +247,7 @@ app.use('/api/cases', caseRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/clinicians', clinicianRoutes);
 app.use('/api/team-leaders', teamLeaderRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 
 logger.info('API routes mounted', {
@@ -250,6 +261,7 @@ logger.info('API routes mounted', {
     '/api/appointments',
     '/api/clinicians',
     '/api/team-leaders',
+    '/api/auth',
     '/api/admin',
   ],
 });

@@ -1,8 +1,26 @@
-const Notification = require('../models/Notification');
-const User = require('../models/User');
-const Case = require('../models/Case');
-const CheckIn = require('../models/CheckIn');
-const RehabilitationPlan = require('../models/RehabilitationPlan');
+// Skip MongoDB imports - using Supabase only
+let Notification, User, Case, CheckIn, RehabilitationPlan;
+try {
+  if (process.env.NODE_ENV !== 'production' && process.env.USE_SUPABASE !== 'true') {
+    Notification = require('../models/Notification');
+    User = require('../models/User');
+    Case = require('../models/Case');
+    CheckIn = require('../models/CheckIn');
+    RehabilitationPlan = require('../models/RehabilitationPlan');
+  } else {
+    Notification = {};
+    User = {};
+    Case = {};
+    CheckIn = {};
+    RehabilitationPlan = {};
+  }
+} catch (error) {
+  Notification = {};
+  User = {};
+  Case = {};
+  CheckIn = {};
+  RehabilitationPlan = {};
+}
 
 // Smart notification service
 class SmartNotificationService {

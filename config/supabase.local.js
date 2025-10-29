@@ -116,25 +116,8 @@ if (supabaseUrl && supabaseAnonKey) {
     }
   };
 } else {
-  // Fallback to mock database if no Supabase config
-  logger.warn('⚠️ Using mock database - Supabase not configured');
-  
-  const mockDb = {
-    users: {
-      async findById() { return { id: 1, name: 'Test User' }; },
-      async findByEmail() { return { id: 1, email: 'test@example.com' }; },
-      async create(data) { return data; },
-      async update(id, data) { return { id, ...data }; },
-      async findMany() { return []; },
-      async count() { return 0; }
-    },
-    work_readiness: {
-      async create(data) { return data; },
-      async findMany() { return []; }
-    }
-  };
-  
-  db = mockDb;
+  logger.error('❌ Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY.');
+  throw new Error('Supabase configuration missing');
 }
 
 // ✅ OPTIMIZATION: Export both regular and admin clients

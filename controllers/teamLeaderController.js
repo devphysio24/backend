@@ -1,11 +1,35 @@
-const User = require('../models/User');
-const Notification = require('../models/Notification');
-const AuthenticationLog = require('../models/AuthenticationLog');
-const WorkReadiness = require('../models/WorkReadiness');
-const ActivityLog = require('../models/ActivityLog');
-const Case = require('../models/Case');
-const CheckIn = require('../models/CheckIn');
-const Incident = require('../models/Incident');
+// Skip MongoDB imports - using Supabase only
+let User, Notification, AuthenticationLog, WorkReadiness, ActivityLog, Case, CheckIn, Incident;
+try {
+  if (process.env.NODE_ENV !== 'production' && process.env.USE_SUPABASE !== 'true') {
+    User = require('../models/User');
+    Notification = require('../models/Notification');
+    AuthenticationLog = require('../models/AuthenticationLog');
+    WorkReadiness = require('../models/WorkReadiness');
+    ActivityLog = require('../models/ActivityLog');
+    Case = require('../models/Case');
+    CheckIn = require('../models/CheckIn');
+    Incident = require('../models/Incident');
+  } else {
+    User = {};
+    Notification = {};
+    AuthenticationLog = {};
+    WorkReadiness = {};
+    ActivityLog = {};
+    Case = {};
+    CheckIn = {};
+    Incident = {};
+  }
+} catch (error) {
+  User = {};
+  Notification = {};
+  AuthenticationLog = {};
+  WorkReadiness = {};
+  ActivityLog = {};
+  Case = {};
+  CheckIn = {};
+  Incident = {};
+}
 const { validationResult } = require('express-validator');
 const { getTeamMemberLoginActivity } = require('../middleware/supabaseAuthLogger');
 const { db } = require('../config/supabase');

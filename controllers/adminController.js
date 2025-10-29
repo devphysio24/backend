@@ -565,6 +565,8 @@ const createUser = async (req, res) => {
     let finalPackage = userPackage || 'package1';
     if (role === 'team_leader') {
       finalPackage = userPackage || 'package2';
+    } else if (role === 'executive') {
+      finalPackage = userPackage || 'package3';
     } else if (role === 'admin') {
       finalPackage = userPackage || 'package4';
     }
@@ -578,6 +580,7 @@ const createUser = async (req, res) => {
       // Workers need a team - assign TEAM GEO as default only if no team provided
       finalTeam = team || 'TEAM GEO';
     }
+    // Executive role doesn't need a team
 
     console.log('📝 Creating Supabase Auth user first...');
     

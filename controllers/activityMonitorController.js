@@ -1,7 +1,23 @@
-const ActivityLog = require('../models/ActivityLog');
-const Case = require('../models/Case');
-const User = require('../models/User');
-const Appointment = require('../models/Appointment');
+// Skip MongoDB imports - using Supabase only
+let ActivityLog, Case, User, Appointment;
+try {
+  if (process.env.NODE_ENV !== 'production' && process.env.USE_SUPABASE !== 'true') {
+    ActivityLog = require('../models/ActivityLog');
+    Case = require('../models/Case');
+    User = require('../models/User');
+    Appointment = require('../models/Appointment');
+  } else {
+    ActivityLog = {};
+    Case = {};
+    User = {};
+    Appointment = {};
+  }
+} catch (error) {
+  ActivityLog = {};
+  Case = {};
+  User = {};
+  Appointment = {};
+}
 
 // @desc    Get activity monitor data for clinician
 // @route   GET /api/clinicians/activity-monitor

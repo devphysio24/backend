@@ -1,6 +1,20 @@
-const User = require('../models/User');
-const Case = require('../models/Case');
-const Appointment = require('../models/Appointment');
+// Skip MongoDB imports - using Supabase only
+let User, Case, Appointment;
+try {
+  if (process.env.NODE_ENV !== 'production' && process.env.USE_SUPABASE !== 'true') {
+    User = require('../models/User');
+    Case = require('../models/Case');
+    Appointment = require('../models/Appointment');
+  } else {
+    User = {};
+    Case = {};
+    Appointment = {};
+  }
+} catch (error) {
+  User = {};
+  Case = {};
+  Appointment = {};
+}
 
 // @desc    Get clinician tasks (cases and appointments)
 // @route   GET /api/clinicians/tasks

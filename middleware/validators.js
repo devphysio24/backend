@@ -264,7 +264,10 @@ const validateNotification = [
 
 const validatePagination = [
   query('page').optional().isInt({ min: 1 }).toInt(),
-  query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+  query('limit').optional().isInt({ min: 1, max: 10000 }).toInt(), // Increased max limit
+  query('offset').optional().isInt({ min: 0 }).toInt(), // Added offset validation
+  query('includeCount').optional().isIn(['true', 'false']), // Added includeCount validation
+  query('teamLeaderId').optional().isString(), // Added teamLeaderId validation
   query('sort').optional().isString(),
   query('order').optional().isIn(['asc', 'desc']),
   handleValidationErrors

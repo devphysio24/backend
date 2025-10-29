@@ -15,6 +15,10 @@ const {
   testUserCreation,
   getAnalytics
 } = require('../controllers/adminController');
+const {
+  generateFlowReport,
+  testOpenAI
+} = require('../controllers/openAIController');
 
 console.log('🔍 Admin routes (Supabase) loaded');
 
@@ -38,6 +42,10 @@ router.get('/statistics', adminLimiter, authenticateToken, requireRole('admin'),
 
 // Authentication logs endpoint
 router.get('/auth-logs', adminLimiter, authenticateToken, requireRole('admin'), asyncHandler(getAuthLogs));
+
+// OpenAI System Flow Analysis endpoints
+router.post('/generate-flow-report', adminLimiter, authenticateToken, requireRole('admin'), asyncHandler(generateFlowReport));
+router.get('/test-openai', adminLimiter, authenticateToken, requireRole('admin'), asyncHandler(testOpenAI));
 
 module.exports = router;
 

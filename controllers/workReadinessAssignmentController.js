@@ -1109,8 +1109,8 @@ exports.getUnselectedWorkers = async (req, res) => {
     const { date } = req.query;
     
     // Get pagination parameters
-    const limit = parseInt(req.query.limit) || 10;
-    const offset = parseInt(req.query.offset) || 0;
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit), 10000) : 1000;
+    const offset = req.query.offset ? parseInt(req.query.offset) : 0;
     const includeCount = req.query.includeCount === 'true';
     
     console.log('Getting unselected workers for team leader:', teamLeaderId, {
@@ -1118,6 +1118,13 @@ exports.getUnselectedWorkers = async (req, res) => {
       offset,
       includeCount
     });
+
+    if (!teamLeaderId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'teamLeaderId is required' 
+      });
+    }
 
     let query = supabaseAdmin
       .from('unselected_workers')

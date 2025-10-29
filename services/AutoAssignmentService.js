@@ -1,6 +1,20 @@
-const User = require('../models/User');
-const Case = require('../models/Case');
-const Notification = require('../models/Notification');
+// Skip MongoDB imports - using Supabase only
+let User, Case, Notification;
+try {
+  if (process.env.NODE_ENV !== 'production' && process.env.USE_SUPABASE !== 'true') {
+    User = require('../models/User');
+    Case = require('../models/Case');
+    Notification = require('../models/Notification');
+  } else {
+    User = {};
+    Case = {};
+    Notification = {};
+  }
+} catch (error) {
+  User = {};
+  Case = {};
+  Notification = {};
+}
 
 // Auto-assignment service for cases
 class AutoAssignmentService {

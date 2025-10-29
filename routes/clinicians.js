@@ -3,9 +3,23 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const asyncHandler = require('../middleware/asyncHandler');
-const User = require('../models/User');
-const Case = require('../models/Case');
-const Appointment = require('../models/Appointment');
+// Skip MongoDB imports - using Supabase only
+let User, Case, Appointment;
+try {
+  if (process.env.NODE_ENV !== 'production' && process.env.USE_SUPABASE !== 'true') {
+    User = require('../models/User');
+    Case = require('../models/Case');
+    Appointment = require('../models/Appointment');
+  } else {
+    User = {};
+    Case = {};
+    Appointment = {};
+  }
+} catch (error) {
+  User = {};
+  Case = {};
+  Appointment = {};
+}
 const { getClinicianTasks, getClinicianWorkload } = require('../controllers/clinicianTaskController');
 const { getActivityMonitor } = require('../controllers/activityMonitorController');
 

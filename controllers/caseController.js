@@ -389,29 +389,7 @@ const getCaseById = async (req, res) => {
       userRole: req.user.role
     });
     
-    // Try to get more diagnostic information (only if MongoDB is available)
-    try {
-      if (mongoose && mongoose.connection && mongoose.connection.db) {
-        console.log('Attempting to get raw case data from database...');
-        const rawCase = await mongoose.connection.db.collection('cases').findOne({ 
-          _id: new mongoose.Types.ObjectId(req.params.id) 
-        });
-        
-        if (rawCase) {
-          console.log('Raw case data found:', {
-            caseNumber: rawCase.caseNumber,
-            clinician: rawCase.clinician,
-            status: rawCase.status
-          });
-        } else {
-          console.log('No raw case data found in database');
-        }
-      } else {
-        console.log('MongoDB not available - skipping diagnostic query');
-      }
-    } catch (diagError) {
-      console.error('Error in diagnostic query:', diagError);
-    }
+    // Diagnostic block referencing MongoDB removed (Supabase-only)
     
     return res.status(500).json({ 
       message: 'Error fetching case details',

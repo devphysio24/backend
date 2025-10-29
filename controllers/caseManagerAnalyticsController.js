@@ -63,7 +63,19 @@ const getCaseManagerOverview = async (req, res) => {
     ).length;
     const completedCases = cases.filter(c => c.status === 'closed' || c.status === 'return_to_work').length;
     const newCasesThisPeriod = periodCases.length;
-    const closedThisPeriod = periodCases.filter(c => c.status === 'closed' || c.status === 'return_to_work').length;
+    
+    // FIXED: Count cases that were CLOSED in this period (not cases created this period that are currently closed)
+    // Use updated_at date when status is closed/return_to_work to determine when case was closed
+    const closedThisPeriod = cases.filter(c => {
+      const isClosed = c.status === 'closed' || c.status === 'return_to_work';
+      if (!isClosed) return false;
+      
+      // Check if case was closed during this period using updated_at
+      const closedDate = c.updated_at ? new Date(c.updated_at) : null;
+      if (!closedDate) return false;
+      
+      return closedDate >= new Date(periodStart);
+    }).length;
     
     // Calculate average case resolution time
     const resolvedCases = cases.filter(c => (c.status === 'closed' || c.status === 'return_to_work') && c.updated_at);

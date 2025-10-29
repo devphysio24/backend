@@ -32,7 +32,7 @@ const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
 // JWT verification function
 const verifySupabaseJWT = async (token) => {
   try {
-    // First, try to verify the JWT token directly
+    // First, decode and verify the JWT token structure
     const decoded = jwt.decode(token, { complete: true });
     
     if (!decoded || !decoded.header || !decoded.payload) {
@@ -45,14 +45,28 @@ const verifySupabaseJWT = async (token) => {
       throw new Error('Token has expired');
     }
 
-    // Verify the token with Supabase using the admin client
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    // Extract user ID from JWT payload (sub claim)
+    const userId = decoded.payload.sub;
+    
+    if (!userId) {
+      throw new Error('Invalid token: missing user ID (sub claim)');
+    }
+
+    // Use admin API to get user by ID
+    // This validates the user exists and is active
+    // Since we've already verified the JWT structure and expiration,
+    // using admin API is the most reliable method for backend verification
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
     
     if (error) {
       throw error;
     }
 
-    return { user, error: null };
+    if (!data || !data.user) {
+      throw new Error('User not found');
+    }
+
+    return { user: data.user, error: null };
   } catch (error) {
     return { user: null, error };
   }

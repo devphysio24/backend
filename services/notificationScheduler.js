@@ -1,44 +1,8 @@
 const cron = require('node-cron');
 require('dotenv').config();
 
-// Skip MongoDB in production or if mongoose is not available
-let mongoose;
-try {
-  if (process.env.NODE_ENV !== 'production' && process.env.USE_SUPABASE !== 'true') {
-    mongoose = require('mongoose');
-    // Connect to MongoDB
-    mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/occupational-rehab', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-  } else {
-    console.log('Skipping MongoDB connection in notificationScheduler - using Supabase only');
-  }
-} catch (error) {
-  console.log('Mongoose not available in notificationScheduler - using Supabase only');
-  mongoose = null;
-}
-
-// Skip MongoDB imports in production or if mongoose is not available
-let Appointment, Notification, User;
-try {
-  if (process.env.NODE_ENV !== 'production' && process.env.USE_SUPABASE !== 'true') {
-    Appointment = require('../models/Appointment');
-    Notification = require('../models/Notification');
-    User = require('../models/User');
-  } else {
-    console.log('Skipping MongoDB model imports in notificationScheduler - using Supabase only');
-    Appointment = {};
-    Notification = {};
-    User = {};
-  }
-} catch (error) {
-  console.log('Mongoose not available in notificationScheduler - using Supabase only');
-  Appointment = {};
-  Notification = {};
-  User = {};
-}
 const NotificationService = require('./NotificationService');
+const { supabaseAdmin } = require('../config/supabase.local');
 
 class NotificationScheduler {
   constructor() {
@@ -85,6 +49,11 @@ class NotificationScheduler {
   // Send notifications for appointments scheduled for today
   async sendTodaysAppointmentNotifications() {
     try {
+      if (!supabaseAdmin) {
+        console.log('⏭️ Supabase not configured, skipping appointment notifications');
+        return;
+      }
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
@@ -92,98 +61,95 @@ class NotificationScheduler {
 
       console.log(`📅 Checking appointments scheduled for ${today.toLocaleDateString()}`);
 
-      // Find all appointments scheduled for today
-      const todaysAppointments = await Appointment.find({
-        scheduledDate: {
-          $gte: today,
-          $lt: tomorrow
-        },
-        status: { $in: ['scheduled', 'confirmed'] }
-      })
-      .populate('worker', 'firstName lastName email')
-      .populate('clinician', 'firstName lastName email')
-      .populate('case', 'caseNumber');
+      // Find all appointments scheduled for today using Supabase
+      const { data: todaysAppointments, error: appointmentsError } = await supabaseAdmin
+        .from('appointments')
+        .select(`
+          id,
+          scheduled_date,
+          status,
+          appointment_type,
+          duration,
+          location,
+          telehealth_info,
+          worker_id,
+          clinician_id,
+          case_id,
+          worker:worker_id(id, first_name, last_name, email),
+          clinician:clinician_id(id, first_name, last_name, email),
+          case:case_id(case_number)
+        `)
+        .gte('scheduled_date', today.toISOString())
+        .lt('scheduled_date', tomorrow.toISOString())
+        .in('status', ['scheduled', 'confirmed']);
 
-      console.log(`📊 Found ${todaysAppointments.length} appointments scheduled for today`);
+      if (appointmentsError) {
+        throw appointmentsError;
+      }
+
+      console.log(`📊 Found ${todaysAppointments?.length || 0} appointments scheduled for today`);
+
+      if (!todaysAppointments || todaysAppointments.length === 0) {
+        console.log('ℹ️ No appointments found for today');
+        return;
+      }
 
       // Prepare batch notifications
       const notifications = [];
 
       for (const appointment of todaysAppointments) {
-        const appointmentTime = new Date(appointment.scheduledDate);
+        const appointmentTime = new Date(appointment.scheduled_date);
         const timeString = appointmentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         // Check if notification was already sent today for this appointment
-        const existingNotification = await Notification.findOne({
-          recipient: { $in: [appointment.worker._id, appointment.clinician._id] },
-          'relatedEntity.id': appointment._id,
-          type: { $in: ['appointment_reminder', 'zoom_meeting_reminder'] },
-          createdAt: { $gte: today }
-        });
+        const { data: existingNotifications } = await supabaseAdmin
+          .from('notifications')
+          .select('id')
+          .in('recipient_id', [appointment.worker_id, appointment.clinician_id])
+          .eq('related_appointment_id', appointment.id)
+          .in('type', ['appointment_reminder', 'zoom_meeting_reminder'])
+          .gte('created_at', today.toISOString())
+          .limit(1);
 
-        if (existingNotification) {
-          console.log(`⏭️  Notification already sent today for appointment ${appointment._id}`);
+        if (existingNotifications && existingNotifications.length > 0) {
+          console.log(`⏭️  Notification already sent today for appointment ${appointment.id}`);
           continue;
         }
         
+        const isZoomMeeting = appointment.location === 'telehealth' && appointment.telehealth_info?.zoom_meeting;
+        const worker = appointment.worker;
+        const clinician = appointment.clinician;
+        const caseData = appointment.case;
+        
         // Add worker notification to batch
-        if (appointment.worker) {
-          const isZoomMeeting = appointment.location === 'telehealth' && appointment.telehealthInfo?.zoomMeeting;
-          
+        if (appointment.worker_id) {
           notifications.push({
-            recipient: appointment.worker._id,
-            sender: appointment.clinician._id,
+            recipient_id: appointment.worker_id,
             type: isZoomMeeting ? 'zoom_meeting_reminder' : 'appointment_reminder',
             title: isZoomMeeting ? '🔗 Zoom Meeting Today' : '📅 Appointment Today',
             message: isZoomMeeting 
               ? `You have a Zoom meeting scheduled for today at ${timeString}. Please join 5 minutes before the scheduled time.`
               : `You have an appointment scheduled for today at ${timeString}. Please arrive 10 minutes early.`,
-            relatedEntity: {
-              type: 'appointment',
-              id: appointment._id
-            },
             priority: 'high',
-            actionUrl: '/appointments',
-            metadata: {
-              appointmentType: appointment.appointmentType,
-              scheduledDate: appointment.scheduledDate,
-              duration: appointment.duration,
-              location: appointment.location,
-              caseNumber: appointment.case.caseNumber,
-              isZoomMeeting: isZoomMeeting,
-              zoomJoinUrl: isZoomMeeting ? appointment.telehealthInfo.zoomMeeting.joinUrl : null
-            }
+            action_url: '/appointments',
+            related_appointment_id: appointment.id,
+            related_case_id: appointment.case_id
           });
         }
 
         // Add clinician notification to batch
-        if (appointment.clinician) {
-          const isZoomMeeting = appointment.location === 'telehealth' && appointment.telehealthInfo?.zoomMeeting;
-          
+        if (appointment.clinician_id && worker) {
           notifications.push({
-            recipient: appointment.clinician._id,
-            sender: appointment.clinician._id, // Self-notification
+            recipient_id: appointment.clinician_id,
             type: isZoomMeeting ? 'zoom_meeting_reminder' : 'appointment_reminder',
             title: isZoomMeeting ? '🔗 Zoom Meeting Today' : '📅 Appointment Today',
             message: isZoomMeeting 
-              ? `You have a Zoom meeting with ${appointment.worker.firstName} ${appointment.worker.lastName} scheduled for today at ${timeString}.`
-              : `You have an appointment with ${appointment.worker.firstName} ${appointment.worker.lastName} scheduled for today at ${timeString}.`,
-            relatedEntity: {
-              type: 'appointment',
-              id: appointment._id
-            },
+              ? `You have a Zoom meeting with ${worker.first_name} ${worker.last_name} scheduled for today at ${timeString}.`
+              : `You have an appointment with ${worker.first_name} ${worker.last_name} scheduled for today at ${timeString}.`,
             priority: 'high',
-            actionUrl: '/appointments',
-            metadata: {
-              appointmentType: appointment.appointmentType,
-              scheduledDate: appointment.scheduledDate,
-              duration: appointment.duration,
-              location: appointment.location,
-              caseNumber: appointment.case.caseNumber,
-              workerName: `${appointment.worker.firstName} ${appointment.worker.lastName}`,
-              isZoomMeeting: isZoomMeeting,
-              zoomJoinUrl: isZoomMeeting ? appointment.telehealthInfo.zoomMeeting.joinUrl : null
-            }
+            action_url: '/appointments',
+            related_appointment_id: appointment.id,
+            related_case_id: appointment.case_id
           });
         }
       }
@@ -204,79 +170,87 @@ class NotificationScheduler {
   // Send reminders for appointments starting soon (within 1 hour)
   async sendUpcomingAppointmentReminders() {
     try {
+      if (!supabaseAdmin) {
+        console.log('⏭️ Supabase not configured, skipping appointment reminders');
+        return;
+      }
+
       const now = new Date();
       const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
 
-      // Find appointments starting within the next hour
-      const upcomingAppointments = await Appointment.find({
-        scheduledDate: {
-          $gte: now,
-          $lte: oneHourFromNow
-        },
-        status: { $in: ['scheduled', 'confirmed'] }
-      })
-      .populate('worker', 'firstName lastName email')
-      .populate('clinician', 'firstName lastName email')
-      .populate('case', 'caseNumber');
+      // Find appointments starting within the next hour using Supabase
+      const { data: upcomingAppointments, error: appointmentsError } = await supabaseAdmin
+        .from('appointments')
+        .select(`
+          id,
+          scheduled_date,
+          status,
+          appointment_type,
+          duration,
+          location,
+          telehealth_info,
+          worker_id,
+          clinician_id,
+          case_id,
+          worker:worker_id(id, first_name, last_name, email),
+          clinician:clinician_id(id, first_name, last_name, email),
+          case:case_id(case_number)
+        `)
+        .gte('scheduled_date', now.toISOString())
+        .lte('scheduled_date', oneHourFromNow.toISOString())
+        .in('status', ['scheduled', 'confirmed']);
+
+      if (appointmentsError) {
+        throw appointmentsError;
+      }
+
+      if (!upcomingAppointments || upcomingAppointments.length === 0) {
+        return;
+      }
 
       // Prepare batch notifications
       const notifications = [];
 
       for (const appointment of upcomingAppointments) {
-        const appointmentTime = new Date(appointment.scheduledDate);
+        const appointmentTime = new Date(appointment.scheduled_date);
         const timeUntilAppointment = Math.round((appointmentTime - now) / (1000 * 60)); // minutes
         
         if (timeUntilAppointment <= 60 && timeUntilAppointment > 0) {
-          const isZoomMeeting = appointment.location === 'telehealth' && appointment.telehealthInfo?.zoomMeeting;
+          const isZoomMeeting = appointment.location === 'telehealth' && appointment.telehealth_info?.zoom_meeting;
+          const worker = appointment.worker;
+          const clinician = appointment.clinician;
           
           // Add worker notification to batch
-          notifications.push({
-            recipient: appointment.worker._id,
-            sender: appointment.clinician._id,
-            type: isZoomMeeting ? 'zoom_meeting_reminder' : 'appointment_reminder',
-            title: isZoomMeeting ? '🔗 Zoom Meeting Starting Soon' : '📅 Appointment Starting Soon',
-            message: isZoomMeeting 
-              ? `Your Zoom meeting starts in ${timeUntilAppointment} minutes. Please join now.`
-              : `Your appointment starts in ${timeUntilAppointment} minutes. Please prepare to arrive.`,
-            relatedEntity: {
-              type: 'appointment',
-              id: appointment._id
-            },
-            priority: 'urgent',
-            actionUrl: '/appointments',
-            metadata: {
-              appointmentType: appointment.appointmentType,
-              scheduledDate: appointment.scheduledDate,
-              timeUntilAppointment: timeUntilAppointment,
-              isZoomMeeting: isZoomMeeting,
-              zoomJoinUrl: isZoomMeeting ? appointment.telehealthInfo.zoomMeeting.joinUrl : null
-            }
-          });
+          if (appointment.worker_id) {
+            notifications.push({
+              recipient_id: appointment.worker_id,
+              type: isZoomMeeting ? 'zoom_meeting_reminder' : 'appointment_reminder',
+              title: isZoomMeeting ? '🔗 Zoom Meeting Starting Soon' : '📅 Appointment Starting Soon',
+              message: isZoomMeeting 
+                ? `Your Zoom meeting starts in ${timeUntilAppointment} minutes. Please join now.`
+                : `Your appointment starts in ${timeUntilAppointment} minutes. Please prepare to arrive.`,
+              priority: 'urgent',
+              action_url: '/appointments',
+              related_appointment_id: appointment.id,
+              related_case_id: appointment.case_id
+            });
+          }
 
           // Add clinician notification to batch
-          notifications.push({
-            recipient: appointment.clinician._id,
-            sender: appointment.clinician._id,
-            type: isZoomMeeting ? 'zoom_meeting_reminder' : 'appointment_reminder',
-            title: isZoomMeeting ? '🔗 Zoom Meeting Starting Soon' : '📅 Appointment Starting Soon',
-            message: isZoomMeeting 
-              ? `Your Zoom meeting with ${appointment.worker.firstName} ${appointment.worker.lastName} starts in ${timeUntilAppointment} minutes.`
-              : `Your appointment with ${appointment.worker.firstName} ${appointment.worker.lastName} starts in ${timeUntilAppointment} minutes.`,
-            relatedEntity: {
-              type: 'appointment',
-              id: appointment._id
-            },
-            priority: 'urgent',
-            actionUrl: '/appointments',
-            metadata: {
-              appointmentType: appointment.appointmentType,
-              scheduledDate: appointment.scheduledDate,
-              timeUntilAppointment: timeUntilAppointment,
-              workerName: `${appointment.worker.firstName} ${appointment.worker.lastName}`,
-              isZoomMeeting: isZoomMeeting,
-              zoomJoinUrl: isZoomMeeting ? appointment.telehealthInfo.zoomMeeting.joinUrl : null
-            }
-          });
+          if (appointment.clinician_id && worker) {
+            notifications.push({
+              recipient_id: appointment.clinician_id,
+              type: isZoomMeeting ? 'zoom_meeting_reminder' : 'appointment_reminder',
+              title: isZoomMeeting ? '🔗 Zoom Meeting Starting Soon' : '📅 Appointment Starting Soon',
+              message: isZoomMeeting 
+                ? `Your Zoom meeting with ${worker.first_name} ${worker.last_name} starts in ${timeUntilAppointment} minutes.`
+                : `Your appointment with ${worker.first_name} ${worker.last_name} starts in ${timeUntilAppointment} minutes.`,
+              priority: 'urgent',
+              action_url: '/appointments',
+              related_appointment_id: appointment.id,
+              related_case_id: appointment.case_id
+            });
+          }
         }
       }
 
